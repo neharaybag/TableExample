@@ -1,6 +1,7 @@
 ﻿using NUnit.Framework;
 using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
+using OpenQA.Selenium.Interactions;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -8,13 +9,14 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace CarWaleExample
 {
-    public class CarTests
+    public class CarTests : BaseTest
     {
-        private IWebDriver driver;
+       
         Dictionary<string, Dictionary<String, List<Vehicle>>> carBrands = new Dictionary<string, Dictionary<String, List<Vehicle>>>();
 
         #region  WebElements
@@ -28,16 +30,20 @@ namespace CarWaleExample
         private By variantTable = By.CssSelector("tbody .variant");
         private By lblVariantName = By.CssSelector(".variant__name-cell .variant__name a");
         private By lblVariantPrice = By.CssSelector(".variant__price-cell span.variant__price");
-
+        private By lnkShowPriceInCity = By.CssSelector("[data-action='showpriceinmycity']");
+        private By txtSelectCity = By.CssSelector("[placeholder='Select City']");
+        private By lnkCityOptions = By.CssSelector("li.ui-menu-item a");
+        private By lnkAreas = By.CssSelector("[cityname]");
+        private By txtArea = By.CssSelector("[placeholder='Select Area']");
+        private By btnCheckNow = By.Id("ctaClick");
+        private By lblCity = By.CssSelector(".selectcustom-input span");
+        private By lblLocation = By.Id("global-place");
+        private By lnkEMI = By.CssSelector("[data-action='EMICalculatorLink']");
+        private By tagTd = By.TagName("td");
+        private By sliderDownPayment = By.CssSelector(".downpayment-unit button.rheostat-handle");
         #endregion 
 
-        [SetUp]
-        public void Setup()
-        {
-            driver = InitialLizDriver();
-            driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(30);
-
-        }
+      
 
 
         [Test]
@@ -49,7 +55,7 @@ namespace CarWaleExample
             List<Vehicle> listVariants = new List<Vehicle>();
             Dictionary<String, List<Vehicle>> carVariants = new Dictionary<String, List<Vehicle>>();
           
-            driver.Navigate().GoToUrl("https://www.carwale.com/");
+            Driver.Navigate().GoToUrl("https://www.carwale.com/");
 
             // Click on Brand
             SelectBrand(brandName);
@@ -58,7 +64,7 @@ namespace CarWaleExample
             var listCars = FindMultipleElements(listCarModels).ToList();
  
 
-            for(int counter=0;counter< listCars.Count; counter++)
+            for(int counter=0; counter < listCars.Count; counter++)
             {
                 listVariants = new List<Vehicle>();
                 carTypes = new List<Vehicle>();
@@ -71,7 +77,16 @@ namespace CarWaleExample
                 // Get list of car vairiants
                 if(variants!=null)
                 {
-                    variants.ForEach(x => listVariants.Add(new Vehicle(x.FindElement(lblVariantName).Text, x.FindElement(lblVariantPrice).Text)));
+                    //variants.ForEach(x => listVariants.Add(new Vehicle(x.FindElement(lblVariantName).Text, x.FindElement(lblVariantPrice).Text)));
+                    foreach(var variant in variants)
+                    {
+                        var columns = variant.FindElements(tagTd).ToList();
+                        columns.ForEach(x => Console.WriteLine(x.Text));
+
+                        // To save values for future use
+                        var variantname = columns[0].Text; // save car name
+                        var variantPrice = columns[1].Text; // save price
+                    }
                 }
                 
                 // Store car name and its variants
@@ -85,25 +100,17 @@ namespace CarWaleExample
 
                 // Get elements again after navigating back 
                 listCars = FindMultipleElements(listCarModels).ToList();
-            }
-           
+            }           
 
             //Add car brand and list of car types in dictionary
             carBrands.Add(brandName, carVariants);
         }
 
 
-        [TearDown]
-        public void TearDown()
-        {
-            driver.Quit();
-        }
-
-
         /// <summary>
         /// One time tear down
         /// </summary>
-        [OneTimeTearDown]
+       // [OneTimeTearDown]
         public void OneTimeTearDown()
         {
             string docPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
@@ -132,42 +139,7 @@ namespace CarWaleExample
                         outputFile.WriteLine();
                     }
                 }
-            }           
-        }
-
-
-        /// <summary>
-        /// Initialize Driver
-        /// </summary>
-        /// <returns></returns>
-        public IWebDriver InitialLizDriver()
-        {
-            ChromeOptions options = new ChromeOptions();
-            options.AddArgument("--start-maximized");
-            return new ChromeDriver(options);
-            
-        }
-
-
-        /// <summary>
-        /// Find elements 
-        /// </summary>
-        /// <param name="locator"></param>
-        /// <returns></returns>
-        public IWebElement Find(By locator)
-        {
-            return driver.FindElement(locator);
-        }
-
-
-        /// <summary>
-        /// Find multiple elements
-        /// </summary>
-        /// <param name="locator"></param>
-        /// <returns></returns>
-        public ReadOnlyCollection<IWebElement> FindMultipleElements(By locator)
-        {
-            return driver.FindElements(locator);
+            }
         }
 
 
@@ -179,6 +151,64 @@ namespace CarWaleExample
         {
             var brands = FindMultipleElements(lnkBrands).ToList();
             brands.Find(x => x.Text.Equals(brand)).Click();
+        }
+
+
+        [Test]
+        [TestCase("Mahindra", "Scorpio")]
+        public void LocationTest(string brand, string car)
+        {
+            Driver.Navigate().GoToUrl("https://www.carwale.com/");
+
+            // Click on Brand
+            SelectBrand(brand);
+
+            // Get all car types by brand
+            var listCarsShowPrice = FindMultipleElements(lnkShowPriceInCity).ToList();
+
+            // Click on show price in my city
+            Click(listCarsShowPrice.Find(x => x.GetAttribute("title").Contains(car)));
+           
+
+            // Enter City
+            Find(txtSelectCity).SendKeys("pu");
+
+            // Select city from dropdown
+            var cities = FindMultipleElements(lnkCityOptions).ToList();
+            Click(cities.Find(x => x.Text.Contains("Pune")));
+
+            // Select area
+            Find(txtArea).SendKeys("baner");
+            Thread.Sleep(10000);
+            var areas = FindMultipleElements(lnkAreas).ToList();
+            foreach (var area in areas)
+            {
+                var city = area.GetAttribute("cityname");
+            }
+           
+            var element = areas.Find(x => x.GetAttribute("cityname").Contains("baner"));
+            element.Click();
+
+            // Click on check now
+            ClickElement(btnCheckNow);
+
+            // Check city is selected
+            Assert.That(Find(lblCity).Text.Contains("Pune"), "City is not displayed");
+
+            // Check global place updated
+            Assert.That(Find(lblLocation).GetAttribute("title").Contains("Pune"), "City is not displayed");
+            Assert.That(Find(lblLocation).GetAttribute("title").Contains("Baner"), "City is not displayed");
+
+            // Click on Emi calculator
+            Find(lnkEMI).Click();
+
+            // Move slider
+            var move = new Actions(Driver);
+            move.ClickAndHold(Find(sliderDownPayment)).MoveByOffset(((int)Find(sliderDownPayment).Size.Width / 4), 0)
+            .Release().Perform();
+
+
+
         }
     }
 
